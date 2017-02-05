@@ -9,9 +9,14 @@ import java.util.Date;
  */
 public abstract class AbstractTimedTask implements TimedTask {
     /**
+     * 任务编号
+     * */
+    protected volatile Integer taskNo;
+
+    /**
      * 任务开始时间
      * */
-    protected volatile Date startTime;
+    protected volatile long startTime;
 
     /**
      * 时间周期
@@ -21,20 +26,21 @@ public abstract class AbstractTimedTask implements TimedTask {
     /**
      * 执行时间
      * */
-    protected volatile Date executionTime;
+    protected volatile long executionTime;
 
-    public AbstractTimedTask(Date startTime, TimePeriod timePeriod) {
+    public AbstractTimedTask(Integer taskNo, long startTime, TimePeriod timePeriod) {
+        this.taskNo = taskNo;
         this.startTime = startTime;
         this.timePeriod = timePeriod;
-        calculateExecutionTime();
+        calculateExecutionTime(startTime);
     }
 
     /**
      * 计算实际执行时间
      * */
-    protected void calculateExecutionTime() {
+    protected void calculateExecutionTime(long initTime) {
         // 执行时间初始为开始时间
-        long initExecutionTime = startTime.getTime();
+        long initExecutionTime = initTime;
         long curTime = System.currentTimeMillis();
 
         // 每次增加周期长的时间直到执行时间大于当前时间，如果周期时间为0，则退出循环
@@ -44,28 +50,34 @@ public abstract class AbstractTimedTask implements TimedTask {
             if(timePeriodMillis <= 0L)
                 break;
             initExecutionTime += timePeriodMillis;
-            // 模拟一次执行
+            // 同时通知时间周期已经执行过一次
             timePeriod.afterExecuteTask();
         }
 
-        executionTime = new Date(initExecutionTime);
+        executionTime = initExecutionTime;
+    }
+
+
+    @Override
+    public Integer getTaskNo() {
+        return taskNo;
     }
 
     @Override
-    public synchronized void setStartTime(Date startTime) {
+    public synchronized void setStartTime(long startTime) {
         this.startTime = startTime;
-        calculateExecutionTime();
+        calculateExecutionTime(this.startTime);
     }
 
     @Override
-    public synchronized Date getStartTime() {
+    public synchronized long getStartTime() {
         return startTime;
     }
 
     @Override
     public synchronized void setTimePeriod(TimePeriod timePeriod) {
         this.timePeriod = timePeriod;
-        calculateExecutionTime();
+        calculateExecutionTime(this.startTime);
     }
 
     @Override
@@ -74,16 +86,40 @@ public abstract class AbstractTimedTask implements TimedTask {
     }
 
     @Override
-    public synchronized Date getExecutionTime() {
+    public synchronized long getExecutionTime() {
         return executionTime;
+    }
+
+    @Override
+    public synchronized void afterExecuteTask() {
+        calculateExecutionTime(this.executionTime);
     }
 
     /**
      * 同时更新开始时间以及时间周期
      * */
-    public synchronized void setStartTimeAndTimePeriod(Date startTime, TimePeriod timePeriod) {
+    public synchronized void setStartTimeAndTimePeriod(long startTime, TimePeriod timePeriod) {
         this.startTime = startTime;
         this.timePeriod = timePeriod;
-        calculateExecutionTime();
+        calculateExecutionTime(this.startTime);
+    }
+
+    @Override
+    public int hashCode() {
+        return this.getTaskNo().hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if(this == obj)
+            return true;
+
+        if(obj == null)
+            return false;
+
+        if(!(obj instanceof  YTask))
+            return false;
+
+        return this.getTaskNo() == ((YTask) obj).getTaskNo();
     }
 }
