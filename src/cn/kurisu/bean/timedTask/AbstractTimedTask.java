@@ -3,6 +3,8 @@ package cn.kurisu.bean.timedTask;
 import cn.kurisu.bean.timePeriod.TimePeriod;
 
 import java.util.Date;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Created by ym on 2017/2/4 0004.
@@ -27,6 +29,11 @@ public abstract class AbstractTimedTask implements TimedTask {
      * 执行时间
      * */
     protected volatile long executionTime;
+
+    /**
+     * 读写锁
+     * */
+    private ReadWriteLock rwLock = new ReentrantReadWriteLock();
 
     public AbstractTimedTask(Integer taskNo, long startTime, TimePeriod timePeriod) {
         this.taskNo = taskNo;
@@ -60,48 +67,88 @@ public abstract class AbstractTimedTask implements TimedTask {
 
     @Override
     public Integer getTaskNo() {
-        return taskNo;
+        rwLock.readLock().lock();
+        try {
+            return taskNo;
+        } finally {
+            rwLock.readLock().unlock();
+        }
     }
 
     @Override
-    public synchronized void setStartTime(long startTime) {
-        this.startTime = startTime;
-        calculateExecutionTime(this.startTime);
+    public void setStartTime(long startTime) {
+        rwLock.writeLock().lock();
+        try {
+            this.startTime = startTime;
+            calculateExecutionTime(this.startTime);
+        } finally {
+          rwLock.writeLock().unlock();
+        }
     }
 
     @Override
-    public synchronized long getStartTime() {
-        return startTime;
+    public long getStartTime() {
+        rwLock.readLock().lock();
+        try {
+            return startTime;
+        } finally {
+            rwLock.readLock().unlock();
+        }
     }
 
     @Override
-    public synchronized void setTimePeriod(TimePeriod timePeriod) {
-        this.timePeriod = timePeriod;
-        calculateExecutionTime(this.startTime);
+    public void setTimePeriod(TimePeriod timePeriod) {
+        rwLock.writeLock().lock();
+        try {
+            this.timePeriod = timePeriod;
+            calculateExecutionTime(this.startTime);
+        } finally {
+            rwLock.writeLock().unlock();
+        }
     }
 
     @Override
-    public synchronized TimePeriod getTimePeriod() {
-        return timePeriod;
+    public TimePeriod getTimePeriod() {
+        rwLock.readLock().lock();
+        try {
+            return timePeriod;
+        } finally {
+            rwLock.readLock().unlock();
+        }
     }
 
     @Override
-    public synchronized long getExecutionTime() {
-        return executionTime;
+    public long getExecutionTime() {
+        rwLock.readLock().lock();
+        try {
+            return executionTime;
+        } finally {
+            rwLock.readLock().unlock();
+        }
     }
 
     @Override
-    public synchronized void afterExecuteTask() {
-        calculateExecutionTime(this.executionTime);
+    public void afterExecuteTask() {
+        rwLock.writeLock().lock();
+        try {
+            calculateExecutionTime(this.startTime);
+        } finally {
+            rwLock.writeLock().unlock();
+        }
     }
 
     /**
      * 同时更新开始时间以及时间周期
      * */
     public synchronized void setStartTimeAndTimePeriod(long startTime, TimePeriod timePeriod) {
-        this.startTime = startTime;
-        this.timePeriod = timePeriod;
-        calculateExecutionTime(this.startTime);
+        rwLock.writeLock().lock();
+        try {
+            this.startTime = startTime;
+            this.timePeriod = timePeriod;
+            calculateExecutionTime(this.startTime);
+        } finally {
+            rwLock.writeLock().unlock();
+        }
     }
 
     @Override

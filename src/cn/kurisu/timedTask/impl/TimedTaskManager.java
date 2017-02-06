@@ -2,9 +2,15 @@ package cn.kurisu.timedTask.impl;
 
 import cn.kurisu.bean.timedTask.YTask;
 import cn.kurisu.timedTask.TaskManager;
+import cn.kurisu.timedTask.executor.TaskExecutor;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.locks.*;
 
 /**
  * Created by ym on 2017/2/5 0005.
@@ -14,6 +20,7 @@ import java.util.concurrent.ConcurrentMap;
  * 实现思路：1.使用map存储需要定时执行的任务
  *          2.使用优先队列存储临近执行的任务，同时从map中移除这些任务
  *          3.进入队列中的任务不可取消与修改
+ *          4.遍历一次map，取出即将执行的任务，周期为2 * 时间范围
  *
  */
 public class TimedTaskManager implements TaskManager {
@@ -25,7 +32,7 @@ public class TimedTaskManager implements TaskManager {
     /**
      * 临近执行的默认误差时间 2000ms
      * */
-    private static final long DEFAULT_EXCUTE_TIME_ERROR = 2000;
+    private static final long DEFAULT_EXECUTE_TIME_ERROR = 2000;
 
     /**
      * 存储任务
@@ -33,47 +40,97 @@ public class TimedTaskManager implements TaskManager {
     private ConcurrentMap<Integer, YTask> tasks = null;
 
     /**
-     * 执行误差时间
+     * 执行时间范围
      * */
-    private volatile long excuteTimeError;
+    private volatile long executeTimeRange;
+
+    /**
+     * 任务池锁，执行新增、移除任务时使用读锁，在做扫描任务时使用写锁
+     * */
+    private ReadWriteLock tasksLock = new ReentrantReadWriteLock();
+
+    /**
+     * 用于唤醒扫描线程的条件
+     * */
+    private Condition awakeScanThreadCondition = tasksLock.writeLock().newCondition();
+
+    /**
+     * 扫描锁
+     * */
+    private Lock scanLock = new ReentrantLock();
+
+    /**
+     * 定时扫描任务池线程
+     * */
+    private Thread scanThread = new Thread(new TasksScanner());
+
+    /**
+     * 任务执行器
+     * */
+    private TaskExecutor taskExecutor = null;
 
     public TimedTaskManager() {
-        this(DEFAULT_MAP_INIT_CAPACITY, DEFAULT_EXCUTE_TIME_ERROR);
+        this(DEFAULT_MAP_INIT_CAPACITY, DEFAULT_EXECUTE_TIME_ERROR);
     }
 
     public TimedTaskManager(int initCapacity) {
-        this(initCapacity, DEFAULT_EXCUTE_TIME_ERROR);
+        this(initCapacity, DEFAULT_EXECUTE_TIME_ERROR);
     }
 
     public TimedTaskManager(long excuteTimeError) {
         this(DEFAULT_MAP_INIT_CAPACITY, excuteTimeError);
     }
 
-    public TimedTaskManager(int initCapacity, long excuteTimeError) {
+    public TimedTaskManager(int initCapacity, long executeTimeRange) {
         this.tasks = new ConcurrentHashMap<Integer, YTask>(initCapacity);
-        if(!validateExcuteTimeError(excuteTimeError))
+        if(!validateExecuteTimeRange(executeTimeRange))
             throw new RuntimeException("执行误差时间必须大于等于0");
-        this.excuteTimeError = excuteTimeError;
+        this.executeTimeRange = executeTimeRange;
+
+        initManager();
+
+    }
+
+    private void initManager() {
+        scanThread.start();
     }
 
 
     @Override
     public boolean addTask(YTask task) {
-        if (!validateTask(task))
-            return false;
+        tasksLock.readLock().lock();
+        try {
+            if (!validateTask(task) || tasks.containsKey(task.getTaskNo()))
+                return false;
+            // 唤醒扫描线程
+            awakeScanThreadCondition.signal();
 
-        tasks.put(task.getTaskNo(), task);
-        return true;
+            tasks.put(task.getTaskNo(), task);
+            return true;
+        } finally {
+            tasksLock.readLock().unlock();
+        }
+
     }
 
     @Override
     public YTask removeTask(Integer taskNo) {
-        return tasks.remove(taskNo);
+        tasksLock.readLock().lock();
+        try {
+            return tasks.remove(taskNo);
+        } finally {
+            tasksLock.readLock().unlock();
+        }
     }
 
     @Override
     public void removeTask(YTask task) {
-        tasks.remove(task.getTaskNo());
+        tasksLock.readLock().lock();
+        try {
+            tasks.remove(task.getTaskNo());
+        } finally {
+            tasksLock.readLock().unlock();
+        }
     }
 
     @Override
@@ -81,19 +138,23 @@ public class TimedTaskManager implements TaskManager {
         return tasks.get(taskNo);
     }
 
-    // TODO 进行加锁
-    public long getExcuteTimeError() {
-        return excuteTimeError;
+    public long getExecuteTimeRange() {
+        return executeTimeRange;
     }
 
-    public void setExcuteTimeError(long excuteTimeError) {
-        this.excuteTimeError = excuteTimeError;
+    public void setExecuteTimeRange(long executeTimeRange) {
+        scanLock.lock();
+        try {
+            this.executeTimeRange = executeTimeRange;
+        } finally {
+            scanLock.unlock();
+        }
     }
 
     /**
      * 校验执行误差时间
      * */
-    private boolean validateExcuteTimeError(long excuteTimeError) {
+    private boolean validateExecuteTimeRange(long excuteTimeError) {
         return excuteTimeError >= 0L;
     }
 
@@ -106,6 +167,83 @@ public class TimedTaskManager implements TaskManager {
         if(task == null || task.getTaskNo() == null)
             return false;
 
-        return task.getExecutionTime() + excuteTimeError >= System.currentTimeMillis();
+        return task.getExecutionTime() + executeTimeRange >= System.currentTimeMillis();
+    }
+
+    /**
+     * 定时扫描任务池
+     * */
+    private class TasksScanner implements Runnable {
+
+        @Override
+        public void run() {
+            while(true) {
+                tasksLock.writeLock().lock();
+                try {
+                    // 如果任务池为空，则阻塞扫描线程
+                    while (tasks.isEmpty()) {
+                        try {
+                            awakeScanThreadCondition.await();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    handleTask();
+
+                    try {
+                        Thread.sleep(getSleepTime());
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                } finally {
+                    tasksLock.writeLock().unlock();
+                }
+
+            }
+
+        }
+
+        /**
+         * 处理任务，把即将执行的任务加入执行队列中
+         * */
+        private void handleTask() {
+            scanLock.lock();
+            try {
+                List<YTask> willExecuteOfTasks = new ArrayList<YTask>();
+
+                long curTime = System.currentTimeMillis();
+                // 遍历任务池，把即将执行的任务加入到执行队列中，并将其从任务池中删除
+                Iterator<Map.Entry<Integer, YTask>> iterator = tasks.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    Map.Entry<Integer, YTask> entry = iterator.next();
+                    YTask task = entry.getValue();
+                    if(isTaskInTimeRange(curTime, task, executeTimeRange)) {
+                        willExecuteOfTasks.add(task);
+                        iterator.remove();
+                    }
+                }
+
+                taskExecutor.addTasks(willExecuteOfTasks);
+            } finally {
+                scanLock.unlock();
+            }
+        }
+
+        /**
+         * 获取休眠时间
+         * */
+        private long getSleepTime() {
+            return 2 * executeTimeRange;
+        }
+
+        /**
+         * 判断任务是否处于执行时间范围内
+         *
+         * 执行时间与当前时间的差的绝对值处于执行时间范围内时，返回true，反之false
+         * */
+        private boolean isTaskInTimeRange(long curTime, YTask task, long executeTimeRange) {
+            return Math.abs(curTime - task.getExecutionTime()) <= executeTimeRange;
+        }
     }
 }
