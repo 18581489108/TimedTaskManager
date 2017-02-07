@@ -101,7 +101,7 @@ public class TimedTaskExecutor implements TaskExecutor {
     }
 
     @Override
-    public void addTasks(Collection<YTask> tasks) {
+    public void addTasks(Collection<? extends YTask> tasks) {
         synchronized (queue) {
             queue.addAll(tasks);
             // 同时唤醒执行线程
