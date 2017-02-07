@@ -1,6 +1,7 @@
 package cn.kurisu.bean.timedTask;
 
 import cn.kurisu.bean.timePeriod.TimePeriod;
+import cn.kurisu.timedTask.TaskManager;
 
 import java.util.Date;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -128,7 +129,7 @@ public abstract class AbstractTimedTask implements TimedTask {
     }
 
     @Override
-    public void afterExecuteTask() {
+    public void afterExecuteTask(TaskManager taskManager) {
         rwLock.writeLock().lock();
         try {
             calculateExecutionTime(this.startTime);

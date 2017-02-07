@@ -1,5 +1,7 @@
 package cn.kurisu.bean.timedTask;
 
+import cn.kurisu.timedTask.TaskManager;
+
 /**
  * Created by ym on 2017/2/4 0004.
  *
@@ -22,7 +24,7 @@ public interface YTask {
     long getExecutionTime();
 
     /**
-     * 执行完任务后回调
+     * 执行完任务后回调，并传入任务管理器
      * */
-    void afterExecuteTask();
+    void afterExecuteTask(TaskManager taskManager);
 }
