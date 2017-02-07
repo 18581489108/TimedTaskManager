@@ -3,6 +3,7 @@ package cn.kurisu.timedTask.impl;
 import cn.kurisu.bean.timedTask.YTask;
 import cn.kurisu.timedTask.TaskManager;
 import cn.kurisu.timedTask.executor.TaskExecutor;
+import cn.kurisu.timedTask.executor.impl.TimedTaskExecutor;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -47,12 +48,12 @@ public class TimedTaskManager implements TaskManager {
     /**
      * 任务池锁，执行新增、移除任务时使用读锁，在做扫描任务时使用写锁
      * */
-    private ReadWriteLock tasksLock = new ReentrantReadWriteLock();
+    private Lock tasksLock = new ReentrantLock();
 
     /**
      * 用于唤醒扫描线程的条件
      * */
-    private Condition awakeScanThreadCondition = tasksLock.writeLock().newCondition();
+    private Condition awakeScanThreadCondition = tasksLock.newCondition();
 
     /**
      * 扫描锁
@@ -92,44 +93,45 @@ public class TimedTaskManager implements TaskManager {
     }
 
     private void initManager() {
+        taskExecutor = new TimedTaskExecutor(this);
         scanThread.start();
+        taskExecutor.start();
     }
 
 
     @Override
     public boolean addTask(YTask task) {
-        tasksLock.readLock().lock();
+        tasksLock.lock();
         try {
             if (!validateTask(task) || tasks.containsKey(task.getTaskNo()))
                 return false;
+            tasks.put(task.getTaskNo(), task);
             // 唤醒扫描线程
             awakeScanThreadCondition.signal();
-
-            tasks.put(task.getTaskNo(), task);
             return true;
         } finally {
-            tasksLock.readLock().unlock();
+            tasksLock.unlock();
         }
 
     }
 
     @Override
     public YTask removeTask(Integer taskNo) {
-        tasksLock.readLock().lock();
+        tasksLock.lock();
         try {
             return tasks.remove(taskNo);
         } finally {
-            tasksLock.readLock().unlock();
+            tasksLock.unlock();
         }
     }
 
     @Override
     public void removeTask(YTask task) {
-        tasksLock.readLock().lock();
+        tasksLock.lock();
         try {
             tasks.remove(task.getTaskNo());
         } finally {
-            tasksLock.readLock().unlock();
+            tasksLock.unlock();
         }
     }
 
@@ -178,7 +180,7 @@ public class TimedTaskManager implements TaskManager {
         @Override
         public void run() {
             while(true) {
-                tasksLock.writeLock().lock();
+                tasksLock.lock();
                 try {
                     // 如果任务池为空，则阻塞扫描线程
                     while (tasks.isEmpty()) {
@@ -188,18 +190,16 @@ public class TimedTaskManager implements TaskManager {
                             e.printStackTrace();
                         }
                     }
-
                     handleTask();
-
-                    try {
-                        Thread.sleep(getSleepTime());
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
                 } finally {
-                    tasksLock.writeLock().unlock();
+                    tasksLock.unlock();
                 }
 
+                try {
+                    Thread.sleep(getSleepTime());
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
 
         }
