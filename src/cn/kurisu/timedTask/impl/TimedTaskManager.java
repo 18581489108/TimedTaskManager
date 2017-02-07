@@ -11,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.*;
 
 /**
@@ -46,14 +48,14 @@ public class TimedTaskManager implements TaskManager {
     private volatile long executeTimeRange;
 
     /**
-     * 任务池锁，执行新增、移除任务时使用读锁，在做扫描任务时使用写锁
+     * 任务池信号量，如果没有任务则阻塞扫描线程
      * */
-    private Lock tasksLock = new ReentrantLock();
+    private Semaphore tasksSemaphore = new Semaphore(0);
 
     /**
-     * 用于唤醒扫描线程的条件
+     * 用于标识是否处于扫描状态
      * */
-    private Condition awakeScanThreadCondition = tasksLock.newCondition();
+    private AtomicBoolean isScanning = new AtomicBoolean(false);
 
     /**
      * 扫描锁
@@ -101,38 +103,37 @@ public class TimedTaskManager implements TaskManager {
 
     @Override
     public boolean addTask(YTask task) {
-        tasksLock.lock();
-        try {
-            if (!validateTask(task) || tasks.containsKey(task.getTaskNo()))
-                return false;
-            tasks.put(task.getTaskNo(), task);
-            // 唤醒扫描线程
-            awakeScanThreadCondition.signal();
-            return true;
-        } finally {
-            tasksLock.unlock();
-        }
+        // 如果处于扫描状态，则等待扫描结束
+        while (isScanning.get());
+
+        if (!validateTask(task) || tasks.containsKey(task.getTaskNo()))
+            return false;
+        tasks.put(task.getTaskNo(), task);
+        // 释放一个信号量
+        tasksSemaphore.release();
+        return true;
 
     }
 
     @Override
     public YTask removeTask(Integer taskNo) {
-        tasksLock.lock();
-        try {
-            return tasks.remove(taskNo);
-        } finally {
-            tasksLock.unlock();
-        }
+        // 如果处于扫描状态，则等待扫描结束
+        while (isScanning.get());
+
+        YTask task = tasks.remove(taskNo);
+        if(task != null)
+            tasksSemaphore.tryAcquire();
+        return task;
     }
 
     @Override
     public void removeTask(YTask task) {
-        tasksLock.lock();
-        try {
-            tasks.remove(task.getTaskNo());
-        } finally {
-            tasksLock.unlock();
-        }
+        // 如果处于扫描状态，则等待扫描结束
+        while (isScanning.get());
+
+        YTask curTask = tasks.remove(task.getTaskNo());
+        if(curTask != null)
+            tasksSemaphore.tryAcquire();
     }
 
     @Override
@@ -180,19 +181,14 @@ public class TimedTaskManager implements TaskManager {
         @Override
         public void run() {
             while(true) {
-                tasksLock.lock();
                 try {
-                    // 如果任务池为空，则阻塞扫描线程
-                    while (tasks.isEmpty()) {
-                        try {
-                            awakeScanThreadCondition.await();
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    handleTask();
-                } finally {
-                    tasksLock.unlock();
+                    tasksSemaphore.acquire();
+                    if(isScanning.compareAndSet(false, true))
+                        handleTask();
+                    isScanning.set(false);
+                    tasksSemaphore.release();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
 
                 try {
@@ -213,6 +209,7 @@ public class TimedTaskManager implements TaskManager {
                 List<YTask> willExecuteOfTasks = new ArrayList<YTask>();
 
                 long curTime = System.currentTimeMillis();
+
                 // 遍历任务池，把即将执行的任务加入到执行队列中，并将其从任务池中删除
                 Iterator<Map.Entry<Integer, YTask>> iterator = tasks.entrySet().iterator();
                 while (iterator.hasNext()) {
@@ -221,6 +218,8 @@ public class TimedTaskManager implements TaskManager {
                     if(isTaskInTimeRange(curTime, task, executeTimeRange)) {
                         willExecuteOfTasks.add(task);
                         iterator.remove();
+                        // 从信号量中移除一个可用信号量
+                        tasksSemaphore.tryAcquire();
                     }
                 }
 
@@ -234,7 +233,7 @@ public class TimedTaskManager implements TaskManager {
          * 获取休眠时间
          * */
         private long getSleepTime() {
-            return 2 * executeTimeRange;
+            return executeTimeRange;
         }
 
         /**
