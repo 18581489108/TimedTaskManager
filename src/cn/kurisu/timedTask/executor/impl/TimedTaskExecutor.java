@@ -8,7 +8,6 @@ import java.util.Collection;
 import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.PriorityBlockingQueue;
 
 /**
  * Created by ym on 2017/2/6 0006.
@@ -150,7 +149,6 @@ public class TimedTaskExecutor implements TaskExecutor {
                     if(!queue.isEmpty()) {
                         YTask curTask = queue.peek();
                         try {
-                            System.out.println("等待执行");
                             queue.wait(curTask.getExecutionTime() - System.currentTimeMillis());
                         } catch (InterruptedException e) {
                             e.printStackTrace();
