@@ -5,6 +5,7 @@ import cn.kurisu.timedTask.TaskManager;
 import cn.kurisu.timedTask.executor.TaskExecutor;
 
 import java.util.Collection;
+import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -28,7 +29,7 @@ public class TimedTaskExecutor implements TaskExecutor {
     /**
      * 使用优先队列来存储任务，执行时间小的优先级高
      * */
-    private PriorityBlockingQueue<YTask> queue = null;
+    private PriorityQueue<YTask> queue = null;
 
     /**
      * 执行者线程
@@ -86,7 +87,7 @@ public class TimedTaskExecutor implements TaskExecutor {
      * 初始化队列
      * */
     private void initQueue(int capacity) {
-        queue = new PriorityBlockingQueue<YTask>(capacity,
+        queue = new PriorityQueue<YTask>(capacity,
                 (YTask task1, YTask task2) -> (int) (task1.getExecutionTime() - task2.getExecutionTime()));
     }
 
@@ -149,6 +150,7 @@ public class TimedTaskExecutor implements TaskExecutor {
                     if(!queue.isEmpty()) {
                         YTask curTask = queue.peek();
                         try {
+                            System.out.println("等待执行");
                             queue.wait(curTask.getExecutionTime() - System.currentTimeMillis());
                         } catch (InterruptedException e) {
                             e.printStackTrace();
