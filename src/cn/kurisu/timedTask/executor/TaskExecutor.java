@@ -21,4 +21,9 @@ public interface TaskExecutor {
      * 加入一系列任务
      * */
     void addTasks(Collection<YTask> tasks);
+
+    /**
+     * 执行器正式开始执行任务
+     * */
+    void start();
 }
