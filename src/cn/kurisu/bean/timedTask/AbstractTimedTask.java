@@ -170,4 +170,9 @@ public abstract class AbstractTimedTask implements TimedTask {
 
         return this.getTaskNo() == ((YTask) obj).getTaskNo();
     }
+
+    @Override
+    public String toString() {
+        return "taskNo:" + taskNo + ", executionTime:" + executionTime;
+    }
 }
