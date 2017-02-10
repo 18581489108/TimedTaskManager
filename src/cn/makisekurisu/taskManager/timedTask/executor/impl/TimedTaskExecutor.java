@@ -38,12 +38,16 @@ public class TimedTaskExecutor implements TaskExecutor {
     /**
      * 持有该任务执行者的管理者
      * */
-    private TaskManager taskManager = null;
+    private volatile TaskManager taskManager = null;
 
     /**
      * 并发执行任务的个数
      * */
     private int countOfConcurrent;
+
+    public TimedTaskExecutor() {
+        this(null);
+    }
 
     public TimedTaskExecutor(TaskManager taskManager) {
         this(taskManager, DEFAULT_INIT_CAPACITY);
@@ -55,8 +59,6 @@ public class TimedTaskExecutor implements TaskExecutor {
     }
 
     public TimedTaskExecutor(TaskManager taskManager, int capacity, int countOfConcurrent) {
-        if(taskManager == null)
-            throw new NullPointerException("TaskManager不应该为null");
         this.taskManager = taskManager;
         this.countOfConcurrent = countOfConcurrent;
         init(capacity);
@@ -72,7 +74,20 @@ public class TimedTaskExecutor implements TaskExecutor {
      * */
     @Override
     public void start() {
+        if(taskManager == null)
+            throw new NullPointerException("启动之前应设置TaskManager");
+
         executorThread.start();
+    }
+
+    public TaskManager getTaskManager() {
+        return taskManager;
+    }
+
+    public void setTaskManager(TaskManager taskManager) {
+        if(taskManager == null)
+            throw new NullPointerException("TaskManager不应该为null");
+        this.taskManager = taskManager;
     }
 
     /**

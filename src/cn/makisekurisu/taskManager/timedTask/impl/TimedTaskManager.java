@@ -70,7 +70,7 @@ public class TimedTaskManager implements TaskManager {
     /**
      * 任务执行器
      * */
-    private TaskExecutor taskExecutor = null;
+    private volatile TaskExecutor taskExecutor = null;
 
     public TimedTaskManager() {
         this(DEFAULT_MAP_INIT_CAPACITY, DEFAULT_EXECUTE_TIME_ERROR);
@@ -90,16 +90,26 @@ public class TimedTaskManager implements TaskManager {
             throw new RuntimeException("执行误差时间必须大于等于0");
         this.executeTimeRange = executeTimeRange;
 
-        initManager();
-
     }
 
-    private void initManager() {
-        taskExecutor = new TimedTaskExecutor(this);
+    public TaskExecutor getTaskExecutor() {
+        return taskExecutor;
+    }
+
+    public void setTaskExecutor(TaskExecutor taskExecutor) {
+        if(taskExecutor == null)
+            throw new NullPointerException("taskExecutor不应该为null");
+        this.taskExecutor = taskExecutor;
+    }
+
+    @Override
+    public void start() {
+        if(taskExecutor == null) {
+            throw new NullPointerException("启动任务管理器之前应设置taskExecutor");
+        }
         scanThread.start();
         taskExecutor.start();
     }
-
 
     @Override
     public boolean addTask(YTask task) {

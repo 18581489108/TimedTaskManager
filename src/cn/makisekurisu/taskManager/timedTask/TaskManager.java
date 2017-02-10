@@ -32,4 +32,9 @@ public interface TaskManager {
      * */
     YTask getTask(Integer taskNo);
 
+    /**
+     * 启动管理器
+     * */
+    void start();
+
 }
