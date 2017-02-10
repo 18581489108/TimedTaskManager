@@ -1,6 +1,6 @@
-package cn.kurisu.bean.timePeriod.impl;
+package cn.makisekurisu.taskManager.bean.timePeriod.impl;
 
-import cn.kurisu.bean.timePeriod.AbstractTimePeriod;
+import cn.makisekurisu.taskManager.bean.timePeriod.AbstractTimePeriod;
 
 /**
  * Created by ym on 2017/2/4 0004.

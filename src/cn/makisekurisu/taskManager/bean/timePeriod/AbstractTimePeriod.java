@@ -1,4 +1,4 @@
-package cn.kurisu.bean.timePeriod;
+package cn.makisekurisu.taskManager.bean.timePeriod;
 
 /**
  * Created by ym on 2017/2/4 0004.

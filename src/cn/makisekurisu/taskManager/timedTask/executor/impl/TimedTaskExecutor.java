@@ -1,8 +1,8 @@
-package cn.kurisu.timedTask.executor.impl;
+package cn.makisekurisu.taskManager.timedTask.executor.impl;
 
-import cn.kurisu.bean.timedTask.YTask;
-import cn.kurisu.timedTask.TaskManager;
-import cn.kurisu.timedTask.executor.TaskExecutor;
+import cn.makisekurisu.taskManager.bean.timedTask.YTask;
+import cn.makisekurisu.taskManager.timedTask.TaskManager;
+import cn.makisekurisu.taskManager.timedTask.executor.TaskExecutor;
 
 import java.util.Collection;
 import java.util.PriorityQueue;
@@ -23,7 +23,7 @@ public class TimedTaskExecutor implements TaskExecutor {
     /**
      * 并发执行任务的默认个数
      * */
-    private static final int DEAFULT_COUNT_OF_CONCURRENT = 3;
+    private static final int DEFAULT_COUNT_OF_CONCURRENT = 3;
 
     /**
      * 使用优先队列来存储任务，执行时间小的优先级高
@@ -51,7 +51,7 @@ public class TimedTaskExecutor implements TaskExecutor {
     }
 
     public TimedTaskExecutor(TaskManager taskManager, int capacity) {
-        this(taskManager, capacity, DEAFULT_COUNT_OF_CONCURRENT);
+        this(taskManager, capacity, DEFAULT_COUNT_OF_CONCURRENT);
     }
 
     public TimedTaskExecutor(TaskManager taskManager, int capacity, int countOfConcurrent) {

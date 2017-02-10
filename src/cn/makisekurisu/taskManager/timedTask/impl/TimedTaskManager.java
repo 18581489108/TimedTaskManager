@@ -1,9 +1,9 @@
-package cn.kurisu.timedTask.impl;
+package cn.makisekurisu.taskManager.timedTask.impl;
 
-import cn.kurisu.bean.timedTask.YTask;
-import cn.kurisu.timedTask.TaskManager;
-import cn.kurisu.timedTask.executor.TaskExecutor;
-import cn.kurisu.timedTask.executor.impl.TimedTaskExecutor;
+import cn.makisekurisu.taskManager.bean.timedTask.YTask;
+import cn.makisekurisu.taskManager.timedTask.TaskManager;
+import cn.makisekurisu.taskManager.timedTask.executor.TaskExecutor;
+import cn.makisekurisu.taskManager.timedTask.executor.impl.TimedTaskExecutor;
 
 import java.util.ArrayList;
 import java.util.Iterator;

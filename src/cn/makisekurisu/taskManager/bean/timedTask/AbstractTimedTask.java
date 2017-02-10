@@ -1,9 +1,8 @@
-package cn.kurisu.bean.timedTask;
+package cn.makisekurisu.taskManager.bean.timedTask;
 
-import cn.kurisu.bean.timePeriod.TimePeriod;
-import cn.kurisu.timedTask.TaskManager;
+import cn.makisekurisu.taskManager.bean.timePeriod.TimePeriod;
+import cn.makisekurisu.taskManager.timedTask.TaskManager;
 
-import java.util.Date;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 

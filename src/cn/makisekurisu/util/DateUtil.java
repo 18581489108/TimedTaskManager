@@ -1,4 +1,4 @@
-package cn.makisekurisu.taskManager.util;
+package cn.makisekurisu.util;
 
 import java.text.DateFormat;
 import java.text.ParseException;

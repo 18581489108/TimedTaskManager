@@ -1,9 +1,8 @@
-package cn.kurisu.timedTask.executor;
+package cn.makisekurisu.taskManager.timedTask.executor;
 
-import cn.kurisu.bean.timedTask.YTask;
+import cn.makisekurisu.taskManager.bean.timedTask.YTask;
 
 import java.util.Collection;
-import java.util.List;
 
 /**
  * Created by ym on 2017/2/6 0006.

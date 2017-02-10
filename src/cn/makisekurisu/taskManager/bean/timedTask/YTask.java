@@ -1,6 +1,6 @@
-package cn.kurisu.bean.timedTask;
+package cn.makisekurisu.taskManager.bean.timedTask;
 
-import cn.kurisu.timedTask.TaskManager;
+import cn.makisekurisu.taskManager.timedTask.TaskManager;
 
 /**
  * Created by ym on 2017/2/4 0004.
