@@ -131,7 +131,7 @@ public abstract class AbstractTimedTask implements TimedTask {
     public void afterExecuteTask(TaskManager taskManager) {
         rwLock.writeLock().lock();
         try {
-            calculateExecutionTime(this.startTime);
+            calculateExecutionTime(this.executionTime);
         } finally {
             rwLock.writeLock().unlock();
         }
